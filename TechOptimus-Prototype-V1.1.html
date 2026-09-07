@@ -204,6 +204,25 @@
     font-size:13px;
   }
   .small-note{font-size:11px;color:#666;margin-top:6px;}
+  .password-wrap{position:relative;}
+  .password-wrap input{padding-right:72px;}
+  .show-password{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    border:none;background:transparent;color:var(--navy);font-size:11px;
+    cursor:pointer;padding:4px 6px;margin:0;
+  }
+  .scanner-box{
+    border:1px dashed var(--navy);background:#f8fafc;padding:14px;
+    text-align:center;margin-top:12px;
+  }
+  #qrVideo{
+    width:100%;max-width:420px;border:1px solid var(--border);
+    border-radius:3px;background:#111;display:none;margin:10px auto;
+  }
+  .public-cert{
+    margin-top:14px;padding:14px;background:#f3f6fa;
+    border-left:4px solid var(--ok);font-size:13px;line-height:1.7;
+  }
   footer{
     text-align:center;
     font-size:11px;
@@ -255,6 +274,7 @@ const db = {
 let currentPage = "landing";
 
 function go(page){
+  if(page !== "landing" && qrStream) stopQRScanner(false);
   currentPage = page;
   render();
 }
@@ -329,6 +349,16 @@ function landingPage(){
       </div>
 
       <div class="card">
+        <h2>Public Certificate Verification</h2>
+        <p style="font-size:13px;line-height:1.6;">
+          Anyone can scan the QR code printed on a verified instrument certificate
+          to view its certificate details and validity status.
+        </p>
+        <button class="primary" onclick="startQRScanner()">Scan Certificate QR</button>
+        <div id="scannerArea"></div>
+      </div>
+
+      <div class="card">
         <h2>Stakeholder Login</h2>
         <p style="font-size:13px;">Instrument Owners, LMOs, GATCs and Admins can log in to access
         their role-specific dashboard.</p>
@@ -378,7 +408,10 @@ function selectRole(role){
       <label>Username</label>
       <input type="text" value="${role}_user" id="uname">
       <label>Password</label>
-      <input type="password" value="demo123" id="pword">
+      <div class="password-wrap">
+        <input type="password" value="demo123" id="pword">
+        <button type="button" class="show-password" onclick="togglePassword()">Show</button>
+      </div>
       <button class="primary" onclick="doLogin('${role}')">Login as ${role.toUpperCase()}</button>
       <div class="small-note">Prototype note: any credentials work — real system would verify against the database.</div>
     </div>`;
@@ -387,6 +420,158 @@ function selectRole(role){
 function doLogin(role){
   db.currentRole = role;
   go(role);
+}
+
+function togglePassword(){
+  const input = document.getElementById("pword");
+  const btn = document.querySelector(".show-password");
+  if(!input || !btn) return;
+  if(input.type === "password"){
+    input.type = "text";
+    btn.textContent = "Hide";
+  }else{
+    input.type = "password";
+    btn.textContent = "Show";
+  }
+}
+
+/* ---------------------------------------------------------
+   PUBLIC QR CERTIFICATE VERIFICATION
+--------------------------------------------------------- */
+let qrStream = null;
+let qrScanTimer = null;
+
+function startQRScanner(){
+  const area = document.getElementById("scannerArea");
+  if(!area) return;
+
+  area.innerHTML = `
+    <div class="scanner-box">
+      <b>Scan Instrument Certificate QR</b>
+      <div class="small-note">
+        Allow camera access when your browser asks. The scanner reads only the
+        certificate QR and shows the matching public certificate details.
+      </div>
+      <video id="qrVideo" autoplay playsinline></video>
+      <div id="scanMessage" class="small-note">Starting camera...</div>
+      <button class="secondary" onclick="stopQRScanner()" style="margin-top:8px;">Stop Scanner</button>
+      <div style="margin-top:12px;text-align:left;">
+        <label>Or enter Certificate ID manually</label>
+        <input type="text" id="publicCertInput" placeholder="e.g. CERT-8841">
+        <button class="secondary" onclick="verifyPublicCertificate()" style="margin-top:8px;">Verify Certificate</button>
+      </div>
+      <div id="publicCertResult"></div>
+    </div>
+  `;
+
+  const video = document.getElementById("qrVideo");
+  const message = document.getElementById("scanMessage");
+
+  if(!("BarcodeDetector" in window)){
+    message.textContent = "Automatic camera scanning is not supported in this browser. Use the Certificate ID field below.";
+    return;
+  }
+
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}})
+    .then(stream => {
+      qrStream = stream;
+      video.srcObject = stream;
+      video.style.display = "block";
+      message.textContent = "Point the camera at the QR code on the certificate.";
+      scanQRCode();
+    })
+    .catch(() => {
+      message.textContent = "Camera access was unavailable. You can still enter the Certificate ID manually.";
+    });
+}
+
+async function scanQRCode(){
+  const video = document.getElementById("qrVideo");
+  if(!video || !qrStream) return;
+
+  try{
+    const detector = new BarcodeDetector({formats:["qr_code"]});
+    const codes = await detector.detect(video);
+
+    if(codes.length){
+      const raw = (codes[0].rawValue || "").trim();
+      stopQRScanner(false);
+
+      if(raw.toUpperCase().startsWith("VERIFY:")){
+        const certId = raw.substring(7).trim().toUpperCase();
+        document.getElementById("publicCertInput").value = certId;
+        verifyPublicCertificate(certId);
+      }else{
+        const result = document.getElementById("publicCertResult");
+        if(result) result.innerHTML = `<div class="public-cert"><b>Invalid QR</b><br>This QR code is not a certificate verification QR.</div>`;
+      }
+      return;
+    }
+  }catch(e){
+    // Keep scanning; browser may temporarily fail while the camera is initializing.
+  }
+
+  qrScanTimer = setTimeout(scanQRCode, 300);
+}
+
+function stopQRScanner(clearArea=true){
+  if(qrScanTimer){
+    clearTimeout(qrScanTimer);
+    qrScanTimer = null;
+  }
+  if(qrStream){
+    qrStream.getTracks().forEach(track => track.stop());
+    qrStream = null;
+  }
+  const video = document.getElementById("qrVideo");
+  if(video){
+    video.pause();
+    video.srcObject = null;
+  }
+  if(clearArea){
+    const area = document.getElementById("scannerArea");
+    if(area) area.innerHTML = "";
+  }
+}
+
+function verifyPublicCertificate(certId){
+  const input = document.getElementById("publicCertInput");
+  const result = document.getElementById("publicCertResult");
+  const value = (certId || (input ? input.value : "")).trim().toUpperCase();
+
+  if(!result) return;
+
+  if(!value){
+    result.innerHTML = `<div class="public-cert"><b>Please enter or scan a Certificate ID.</b></div>`;
+    return;
+  }
+
+  const inst = db.instruments.find(i => i.certId === value);
+
+  if(!inst){
+    result.innerHTML = `<div class="public-cert"><b>Certificate not found</b><br>No verified certificate matches <b>${value}</b>.</div>`;
+    return;
+  }
+
+  if(!inst.certId){
+    result.innerHTML = `<div class="public-cert"><b>Certificate not issued</b><br>This instrument does not have a certificate yet.</div>`;
+    return;
+  }
+
+  const today = new Date();
+  const expiry = new Date(inst.expiry);
+  const isValid = !isNaN(expiry.getTime()) && expiry >= today;
+
+  result.innerHTML = `
+    <div class="public-cert">
+      <b>Certificate Verified</b><br>
+      <b>Certificate ID:</b> ${inst.certId}<br>
+      <b>Instrument ID:</b> ${inst.id}<br>
+      <b>Instrument:</b> ${inst.type}<br>
+      <b>Owner:</b> ${inst.owner}<br>
+      <b>Valid Till:</b> ${inst.expiry}<br>
+      <b>Status:</b> <span class="status ${isValid ? "verified" : "overdue"}">${isValid ? "VALID" : "EXPIRED"}</span>
+    </div>`;
 }
 
 /* ---------------------------------------------------------
