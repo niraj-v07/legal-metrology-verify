@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Legal Metrology e-Verification Portal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
   :root{
     --navy:#0b2e59;
@@ -219,6 +220,11 @@
     width:100%;max-width:420px;border:1px solid var(--border);
     border-radius:3px;background:#111;display:none;margin:10px auto;
   }
+.language-btn:hover,.language-btn.active{border-color:var(--navy);background:#eef3f9;color:var(--navy);font-weight:600;}
+  .scan-status{margin-top:8px;padding:8px 10px;border-left:4px solid var(--navy);background:#f3f6fa;font-size:12px;text-align:left;}
+  .scanner-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+  #qrCanvas{display:none;}
+  @media(max-width:760px){.login-layout{grid-template-columns:1fr;}.role-grid{grid-template-columns:repeat(2,1fr);}}
   .public-cert{
     margin-top:14px;padding:14px;background:#f3f6fa;
     border-left:4px solid var(--ok);font-size:13px;line-height:1.7;
@@ -229,6 +235,38 @@
     color:#777;
     padding:16px;
   }
+
+  .header-language{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin-left:auto;
+    margin-right:10px;
+  }
+  .header-language label{
+    font-size:12px;
+    color:#d7deea;
+    font-weight:600;
+  }
+  .header-language select{
+    appearance:auto;
+    min-width:112px;
+    padding:7px 30px 7px 10px;
+    border:1px solid #60728c;
+    border-radius:4px;
+    background:#123963;
+    color:#fff;
+    font-size:12px;
+    cursor:pointer;
+    outline:none;
+  }
+  .header-language select:focus{border-color:#fff;}
+  .header-language option{background:#fff;color:#111;}
+  @media(max-width:700px){
+    .header-language label{display:none;}
+    .header-language select{min-width:92px;padding:6px 22px 6px 8px;}
+  }
+
 </style>
 </head>
 <body>
@@ -294,13 +332,23 @@ function render(){
 
 function renderTopbarActions(){
   const el = document.getElementById("topbarActions");
-  const homeBtn = `<button onclick="goHome()">Home</button>`;
+  const languageSelector = `
+    <div class="header-language">
+      <label for="headerLanguage">${t('language')}:</label>
+      <select id="headerLanguage" onchange="changeLanguage(this.value)" aria-label="${t('language')}">
+        <option value="en" ${currentLanguage==='en'?'selected':''}>English</option>
+        <option value="hi" ${currentLanguage==='hi'?'selected':''}>हिन्दी</option>
+        <option value="ta" ${currentLanguage==='ta'?'selected':''}>தமிழ்</option>
+      </select>
+    </div>`;
+  const homeBtn = `<button onclick="goHome()">${t("home")}</button>`;
+  // Keep the language selector visible on the Home page, Login page, and dashboards.
   if(db.currentRole){
-    el.innerHTML = `${homeBtn}<button onclick="logout()">Logout (${db.currentRole.toUpperCase()})</button>`;
+    el.innerHTML = `${languageSelector}${homeBtn}<button onclick="logout()">${t("logout")} (${t(db.currentRole)})</button>`;
   } else if(currentPage !== "landing"){
-    el.innerHTML = `${homeBtn}<button onclick="go('login')">Login</button>`;
+    el.innerHTML = `${languageSelector}${homeBtn}<button onclick="go('login')">Login</button>`;
   } else {
-    el.innerHTML = `<button onclick="go('login')">Login</button>`;
+    el.innerHTML = `${languageSelector}<button onclick="go('login')">Login</button>`;
   }
 }
 
@@ -313,7 +361,7 @@ function goHome(){
 function renderTabs(){
   const el = document.getElementById("tabBar");
   if(!db.currentRole){ el.innerHTML=""; return; }
-  const tabs = {owner:"Owner Dashboard", lmo:"LMO Dashboard", gatc:"GATC Dashboard", admin:"Admin Dashboard"};
+  const tabs = {owner:t("ownerDashboard"), lmo:t("lmoDashboard"), gatc:t("gatcDashboard"), admin:t("adminDashboard")};
   const key = db.currentRole;
   el.innerHTML = `<button class="active">${tabs[key]}</button>`;
 }
@@ -329,40 +377,34 @@ function logout(){
 function landingPage(){
   return `
     <div class="card">
-      <h2>About this Portal</h2>
+      <h2>${t('about')}</h2>
       <p style="font-size:13px;line-height:1.7;">
-        Under the Legal Metrology Act, 2009, every weighing and measuring instrument used in trade
-        must be periodically verified and stamped. This portal digitizes that entire process —
-        online applications, digital inspection recording, and QR-authenticated certificates —
-        connecting Instrument Owners, Legal Metrology Officers (LMOs), Government Approved Test
-        Centres (GATCs), and Regulators on one platform.
+        ${t('aboutText')}
       </p>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <h2>Track an Application</h2>
-        <label>Enter Certificate / Application ID</label>
-        <input type="text" id="trackInput" placeholder="e.g. CERT-8841 or INS-1002">
-        <button class="primary" onclick="trackStatus()">Check Status</button>
+        <h2>${t('track')}</h2>
+        <label>${t('idLabel')}</label>
+        <input type="text" id="trackInput" placeholder="${t('placeholder')}">
+        <button class="primary" onclick="trackStatus()">${t('checkStatus')}</button>
         <div id="trackResult"></div>
       </div>
 
       <div class="card">
-        <h2>Public Certificate Verification</h2>
+        <h2>${t('publicVerification')}</h2>
         <p style="font-size:13px;line-height:1.6;">
-          Anyone can scan the QR code printed on a verified instrument certificate
-          to view its certificate details and validity status.
+          ${t('publicText')}
         </p>
-        <button class="primary" onclick="startQRScanner()">Scan Certificate QR</button>
+        <button class="primary" onclick="startQRScanner()">${t('scanQR')}</button>
         <div id="scannerArea"></div>
       </div>
 
       <div class="card">
-        <h2>Stakeholder Login</h2>
-        <p style="font-size:13px;">Instrument Owners, LMOs, GATCs and Admins can log in to access
-        their role-specific dashboard.</p>
-        <button class="primary" onclick="go('login')">Proceed to Login</button>
+        <h2>${t('stakeholder')}</h2>
+        <p style="font-size:13px;">${t('stakeholderText')}</p>
+        <button class="primary" onclick="go('login')">${t('proceed')}</button>
       </div>
     </div>
   `;
@@ -373,15 +415,129 @@ function trackStatus(){
   const found = db.instruments.find(i => i.id === val || i.certId === val);
   const box = document.getElementById("trackResult");
   if(!found){
-    box.innerHTML = `<div class="track-result">No record found for "${val}". Try INS-1001 or CERT-8841.</div>`;
+    box.innerHTML = `<div class="track-result">${t("noRecord")} "${val}". ${t("tryIds")}</div>`;
     return;
   }
   box.innerHTML = `
     <div class="track-result">
       <b>${found.id}</b> — ${found.type} (${found.owner})<br>
       Status: <span class="status ${found.status}">${found.status.toUpperCase()}</span><br>
-      ${found.certId ? "Certificate: "+found.certId+" — Valid till "+found.expiry : "Certificate not yet issued."}
+      ${found.certId ? "Certificate: "+found.certId+" — Valid till "+found.expiry : t("certificateNotIssued")}
     </div>`;
+}
+
+const translations = {
+  en:{selectRole:'Select Your Role',owner:'Instrument Owner',lmo:'LMO',gatc:'GATC',admin:'Admin',username:'Username',password:'Password',login:'Login as',note:'Prototype note: any credentials work — real system would verify against the database.',show:'Show',language:'Language',about:'About this Portal',aboutText:'Under the Legal Metrology Act, 2009, every weighing and measuring instrument used in trade must be periodically verified and stamped. This portal digitizes that entire process — online applications, digital inspection recording, and QR-authenticated certificates — connecting Instrument Owners, Legal Metrology Officers (LMOs), Government Approved Test Centres (GATCs), and Regulators on one platform.',track:'Track an Application',idLabel:'Enter Certificate / Application ID',placeholder:'e.g. CERT-8841 or INS-1002',checkStatus:'Check Status',publicVerification:'Public Certificate Verification',publicText:'Anyone can scan the QR code printed on a verified instrument certificate to view its certificate details and validity status.',scanQR:'Scan Certificate QR',stakeholder:'Stakeholder Login',stakeholderText:'Instrument Owners, LMOs, GATCs and Admins can log in to access their role-specific dashboard.',proceed:'Proceed to Login'},
+  hi:{selectRole:'अपनी भूमिका चुनें',owner:'उपकरण मालिक',lmo:'एलएमओ',gatc:'जीएटीसी',admin:'एडमिन',username:'उपयोगकर्ता नाम',password:'पासवर्ड',login:'लॉगिन करें',note:'प्रोटोटाइप: कोई भी क्रेडेंशियल काम करेगा — वास्तविक सिस्टम डेटाबेस से सत्यापन करेगा।',show:'दिखाएँ',language:'भाषा',about:'इस पोर्टल के बारे में',aboutText:'कानूनी मापविज्ञान अधिनियम, 2009 के तहत व्यापार में उपयोग किए जाने वाले प्रत्येक तौल और माप उपकरण का समय-समय पर सत्यापन और मुहर लगाना आवश्यक है। यह पोर्टल ऑनलाइन आवेदन, डिजिटल निरीक्षण रिकॉर्डिंग और QR-प्रमाणित प्रमाणपत्रों के माध्यम से पूरी प्रक्रिया को डिजिटल बनाता है और उपकरण मालिकों, कानूनी मापविज्ञान अधिकारियों (LMO), सरकारी अनुमोदित परीक्षण केंद्रों (GATC) और नियामकों को एक मंच पर जोड़ता है।',track:'आवेदन ट्रैक करें',idLabel:'प्रमाणपत्र / आवेदन आईडी दर्ज करें',placeholder:'उदा. CERT-8841 या INS-1002',checkStatus:'स्थिति जांचें',publicVerification:'सार्वजनिक प्रमाणपत्र सत्यापन',publicText:'कोई भी सत्यापित उपकरण प्रमाणपत्र पर दिए गए QR कोड को स्कैन करके प्रमाणपत्र का विवरण और वैधता स्थिति देख सकता है।',scanQR:'प्रमाणपत्र QR स्कैन करें',stakeholder:'हितधारक लॉगिन',stakeholderText:'उपकरण मालिक, LMO, GATC और एडमिन अपने संबंधित डैशबोर्ड तक पहुंचने के लिए लॉगिन कर सकते हैं।',proceed:'लॉगिन करें'},
+  ta:{selectRole:'உங்கள் பங்கைத் தேர்ந்தெடுக்கவும்',owner:'கருவி உரிமையாளர்',lmo:'LMO',gatc:'GATC',admin:'நிர்வாகி',username:'பயனர் பெயர்',password:'கடவுச்சொல்',login:'உள்நுழைக',note:'முன்மாதிரி: எந்த சான்றுகளும் வேலை செய்யும் — உண்மையான அமைப்பு தரவுத்தளத்தில் சரிபார்க்கும்.',show:'காட்டு',language:'மொழி',about:'இந்த தளம் பற்றி',aboutText:'சட்ட அளவியல் சட்டம், 2009 இன் கீழ், வணிகத்தில் பயன்படுத்தப்படும் ஒவ்வொரு எடை மற்றும் அளவீட்டு கருவியும் குறிப்பிட்ட கால இடைவெளியில் சரிபார்க்கப்பட்டு முத்திரையிடப்பட வேண்டும். இந்த தளம் ஆன்லைன் விண்ணப்பங்கள், டிஜிட்டல் ஆய்வு பதிவுகள் மற்றும் QR-சரிபார்க்கப்பட்ட சான்றிதழ்கள் மூலம் முழு செயல்முறையையும் மின்னணுமயமாக்கி, கருவி உரிமையாளர்கள், சட்ட அளவியல் அதிகாரிகள் (LMO), அரசு அங்கீகரிக்கப்பட்ட சோதனை மையங்கள் (GATC) மற்றும் ஒழுங்குமுறை அமைப்புகளை ஒரே தளத்தில் இணைக்கிறது.',track:'விண்ணப்பத்தை கண்காணிக்கவும்',idLabel:'சான்றிதழ் / விண்ணப்ப ஐடியை உள்ளிடவும்',placeholder:'எ.கா. CERT-8841 அல்லது INS-1002',checkStatus:'நிலையைச் சரிபார்க்கவும்',publicVerification:'பொது சான்றிதழ் சரிபார்ப்பு',publicText:'சரிபார்க்கப்பட்ட கருவி சான்றிதழில் உள்ள QR குறியீட்டை யார் வேண்டுமானாலும் ஸ்கேன் செய்து சான்றிதழ் விவரங்கள் மற்றும் செல்லுபடியாகும் நிலையைப் பார்க்கலாம்.',scanQR:'சான்றிதழ் QR-ஐ ஸ்கேன் செய்யவும்',stakeholder:'பங்குதாரர் உள்நுழைவு',stakeholderText:'கருவி உரிமையாளர்கள், LMO, GATC மற்றும் நிர்வாகிகள் தங்களுக்கான டாஷ்போர்டை அணுக உள்நுழையலாம்.',proceed:'உள்நுழையவும்'}
+};
+
+/* Dashboard + shared navigation translations */
+const dashboardTranslations = {
+  en:{
+    home:'Home', logout:'Logout', ownerDashboard:'Owner Dashboard', lmoDashboard:'LMO Dashboard',
+    gatcDashboard:'GATC Dashboard', adminDashboard:'Admin Dashboard',
+    myInstruments:'My Instruments', searchInstrument:'Search by Instrument ID or Type',
+    ownerSearchPlaceholder:'e.g. INS-1001 or Weighbridge', instrumentId:'Instrument ID',
+    type:'Type', status:'Status', certificate:'Certificate', viewQR:'View QR',
+    applyVerification:'Apply for New Verification', instrumentType:'Instrument Type',
+    uploadDocument:'Upload Supporting Document', submitApplication:'Submit Application',
+    digitalCertificate:'Digital Certificate', instrument:'Instrument', ownerLabel:'Owner',
+    validTill:'Valid Till', scanToVerify:'Scan this QR to verify authenticity publicly.',
+    printCertificate:'Print / Export Certificate', assignedTasks:'Assigned Verification Tasks',
+    action:'Action', inspect:'Inspect', recordInspection:'Record Inspection',
+    observation:'Observation', passTolerance:'Pass — within tolerance',
+    failTolerance:'Fail — out of tolerance', remarks:'Remarks',
+    remarksPlaceholder:'e.g. calibrated against standard weight set',
+    submitGenerate:'Submit & Generate Certificate', totalInstruments:'Total Instruments',
+    verified:'Verified', pendingAssigned:'Pending / Assigned', overdue:'Overdue',
+    searchRetrieve:'Search & Retrieve Records',
+    searchAdmin:'Search by Instrument ID, Owner, or Type',
+    adminSearchPlaceholder:'e.g. Ramesh, Weighbridge, INS-1004',
+    allApplications:'All Applications — System Wide', assignedTo:'Assigned To',
+    exportReport:'Export Report (CSV)', applicationSubmitted:'Application submitted! Reference ID: ',
+    inspectionRecorded:'Inspection recorded. Certificate ', generatedFor:' generated for ',
+    noRecord:'No record found for', tryIds:'Try INS-1001 or CERT-8841.',
+    certificateNotIssued:'Certificate not yet issued.',
+    certificateVerified:'Certificate Verified', certificateId:'Certificate ID',
+    publicCertificate:'Public Certificate', valid:'VALID', expired:'EXPIRED',
+    certificateNotFound:'Certificate not found', noCertificateMatches:'No certificate matches',
+    pleaseEnterCertificate:'Please enter or scan a Certificate ID.',
+    hide:'Hide'
+  },
+  hi:{
+    home:'होम', logout:'लॉगआउट', ownerDashboard:'मालिक डैशबोर्ड', lmoDashboard:'एलएमओ डैशबोर्ड',
+    gatcDashboard:'जीएटीसी डैशबोर्ड', adminDashboard:'एडमिन डैशबोर्ड',
+    myInstruments:'मेरे उपकरण', searchInstrument:'उपकरण आईडी या प्रकार से खोजें',
+    ownerSearchPlaceholder:'उदा. INS-1001 या Weighbridge', instrumentId:'उपकरण आईडी',
+    type:'प्रकार', status:'स्थिति', certificate:'प्रमाणपत्र', viewQR:'QR देखें',
+    applyVerification:'नए सत्यापन के लिए आवेदन करें', instrumentType:'उपकरण का प्रकार',
+    uploadDocument:'सहायक दस्तावेज़ अपलोड करें', submitApplication:'आवेदन जमा करें',
+    digitalCertificate:'डिजिटल प्रमाणपत्र', instrument:'उपकरण', ownerLabel:'मालिक',
+    validTill:'मान्य तिथि', scanToVerify:'प्रामाणिकता की सार्वजनिक पुष्टि के लिए इस QR को स्कैन करें।',
+    printCertificate:'प्रमाणपत्र प्रिंट / एक्सपोर्ट करें', assignedTasks:'सौंपे गए सत्यापन कार्य',
+    action:'कार्रवाई', inspect:'निरीक्षण करें', recordInspection:'निरीक्षण दर्ज करें',
+    observation:'अवलोकन', passTolerance:'पास — निर्धारित सीमा के भीतर',
+    failTolerance:'फेल — निर्धारित सीमा से बाहर', remarks:'टिप्पणियाँ',
+    remarksPlaceholder:'उदा. मानक वजन सेट से कैलिब्रेट किया गया',
+    submitGenerate:'जमा करें और प्रमाणपत्र बनाएं', totalInstruments:'कुल उपकरण',
+    verified:'सत्यापित', pendingAssigned:'लंबित / सौंपे गए', overdue:'समय-सीमा पार',
+    searchRetrieve:'रिकॉर्ड खोजें और प्राप्त करें',
+    searchAdmin:'उपकरण आईडी, मालिक या प्रकार से खोजें',
+    adminSearchPlaceholder:'उदा. Ramesh, Weighbridge, INS-1004',
+    allApplications:'सभी आवेदन — पूरे सिस्टम में', assignedTo:'सौंपा गया',
+    exportReport:'रिपोर्ट एक्सपोर्ट करें (CSV)', applicationSubmitted:'आवेदन जमा हुआ! संदर्भ आईडी: ',
+    inspectionRecorded:'निरीक्षण दर्ज हुआ। प्रमाणपत्र ', generatedFor:' को जारी किया गया ',
+    noRecord:'कोई रिकॉर्ड नहीं मिला', tryIds:'INS-1001 या CERT-8841 आज़माएँ।',
+    certificateNotIssued:'प्रमाणपत्र अभी जारी नहीं हुआ है।',
+    certificateVerified:'प्रमाणपत्र सत्यापित', certificateId:'प्रमाणपत्र आईडी',
+    publicCertificate:'सार्वजनिक प्रमाणपत्र', valid:'मान्य', expired:'समाप्त',
+    certificateNotFound:'प्रमाणपत्र नहीं मिला', noCertificateMatches:'इससे कोई प्रमाणपत्र मेल नहीं खाता',
+    pleaseEnterCertificate:'कृपया प्रमाणपत्र आईडी दर्ज करें या स्कैन करें।', hide:'छिपाएँ'
+  },
+  ta:{
+    home:'முகப்பு', logout:'வெளியேறு', ownerDashboard:'உரிமையாளர் டாஷ்போர்டு', lmoDashboard:'LMO டாஷ்போர்டு',
+    gatcDashboard:'GATC டாஷ்போர்டு', adminDashboard:'நிர்வாகி டாஷ்போர்டு',
+    myInstruments:'எனது கருவிகள்', searchInstrument:'கருவி ஐடி அல்லது வகை மூலம் தேடவும்',
+    ownerSearchPlaceholder:'எ.கா. INS-1001 அல்லது Weighbridge', instrumentId:'கருவி ஐடி',
+    type:'வகை', status:'நிலை', certificate:'சான்றிதழ்', viewQR:'QR பார்க்கவும்',
+    applyVerification:'புதிய சரிபார்ப்புக்கு விண்ணப்பிக்கவும்', instrumentType:'கருவி வகை',
+    uploadDocument:'ஆதார ஆவணத்தைப் பதிவேற்றவும்', submitApplication:'விண்ணப்பத்தை சமர்ப்பிக்கவும்',
+    digitalCertificate:'மின்னணு சான்றிதழ்', instrument:'கருவி', ownerLabel:'உரிமையாளர்',
+    validTill:'செல்லுபடியாகும் தேதி', scanToVerify:'நம்பகத்தன்மையை பொதுவாக சரிபார்க்க இந்த QR-ஐ ஸ்கேன் செய்யவும்.',
+    printCertificate:'சான்றிதழை அச்சிடு / ஏற்றுமதி செய்', assignedTasks:'ஒதுக்கப்பட்ட சரிபார்ப்பு பணிகள்',
+    action:'செயல்', inspect:'ஆய்வு செய்', recordInspection:'ஆய்வைப் பதிவு செய்',
+    observation:'கவனிப்பு', passTolerance:'தேர்ச்சி — அனுமதிக்கப்பட்ட வரம்பிற்குள்',
+    failTolerance:'தோல்வி — அனுமதிக்கப்பட்ட வரம்பிற்கு வெளியே', remarks:'குறிப்புகள்',
+    remarksPlaceholder:'எ.கா. நிலையான எடை தொகுப்புடன் அளவுத்திருத்தம் செய்யப்பட்டது',
+    submitGenerate:'சமர்ப்பித்து சான்றிதழை உருவாக்கவும்', totalInstruments:'மொத்த கருவிகள்',
+    verified:'சரிபார்க்கப்பட்டது', pendingAssigned:'நிலுவை / ஒதுக்கப்பட்டது', overdue:'காலதாமதம்',
+    searchRetrieve:'பதிவுகளைத் தேடி பெறுக',
+    searchAdmin:'கருவி ஐடி, உரிமையாளர் அல்லது வகை மூலம் தேடவும்',
+    adminSearchPlaceholder:'எ.கா. Ramesh, Weighbridge, INS-1004',
+    allApplications:'அனைத்து விண்ணப்பங்கள் — முழு அமைப்பு', assignedTo:'ஒதுக்கப்பட்டது',
+    exportReport:'அறிக்கையை ஏற்றுமதி செய் (CSV)', applicationSubmitted:'விண்ணப்பம் சமர்ப்பிக்கப்பட்டது! குறிப்பு ஐடி: ',
+    inspectionRecorded:'ஆய்வு பதிவு செய்யப்பட்டது. சான்றிதழ் ', generatedFor:' என்பவருக்கு உருவாக்கப்பட்டது ',
+    noRecord:'பதிவு எதுவும் கிடைக்கவில்லை', tryIds:'INS-1001 அல்லது CERT-8841 முயற்சிக்கவும்.',
+    certificateNotIssued:'சான்றிதழ் இன்னும் வழங்கப்படவில்லை.',
+    certificateVerified:'சான்றிதழ் சரிபார்க்கப்பட்டது', certificateId:'சான்றிதழ் ஐடி',
+    publicCertificate:'பொது சான்றிதழ்', valid:'செல்லுபடியாகும்', expired:'காலாவதியானது',
+    certificateNotFound:'சான்றிதழ் கிடைக்கவில்லை', noCertificateMatches:'எந்த சான்றிதழும் பொருந்தவில்லை',
+    pleaseEnterCertificate:'சான்றிதழ் ஐடியை உள்ளிடவும் அல்லது ஸ்கேன் செய்யவும்.', hide:'மறை'
+  }
+};
+Object.keys(dashboardTranslations).forEach(lang => Object.assign(translations[lang], dashboardTranslations[lang]));
+['pending','assigned','overdue','verified'].forEach(k => { if(!translations.en[k]) translations.en[k]=k.toUpperCase(); });
+Object.assign(translations.hi,{pending:'लंबित',assigned:'सौंपा गया',overdue:'समय-सीमा पार',verified:'सत्यापित'});
+Object.assign(translations.ta,{pending:'நிலுவை',assigned:'ஒதுக்கப்பட்டது',overdue:'காலதாமதம்',verified:'சரிபார்க்கப்பட்டது'});
+
+let currentLanguage = 'en';
+function t(key){ return (translations[currentLanguage] && translations[currentLanguage][key]) || translations.en[key] || key; }
+function changeLanguage(lang){
+  if(!translations[lang]) return;
+  currentLanguage=lang;
+  document.documentElement.lang=lang==='hi'?'hi':(lang==='ta'?'ta':'en');
+  render();
 }
 
 /* ---------------------------------------------------------
@@ -390,12 +546,12 @@ function trackStatus(){
 function loginPage(){
   return `
     <div class="card">
-      <h2>Select Your Role</h2>
+      <h2>${t('selectRole')}</h2>
       <div class="role-grid">
-        <div class="role-box" onclick="selectRole('owner')"><span class="icon">&#128100;</span>Instrument Owner</div>
-        <div class="role-box" onclick="selectRole('lmo')"><span class="icon">&#128737;</span>LMO</div>
-        <div class="role-box" onclick="selectRole('gatc')"><span class="icon">&#127970;</span>GATC</div>
-        <div class="role-box" onclick="selectRole('admin')"><span class="icon">&#9881;</span>Admin</div>
+        <div class="role-box" onclick="selectRole('owner')"><span class="icon">&#128100;</span>${t('owner')}</div>
+        <div class="role-box" onclick="selectRole('lmo')"><span class="icon">&#128737;</span>${t('lmo')}</div>
+        <div class="role-box" onclick="selectRole('gatc')"><span class="icon">&#127970;</span>${t('gatc')}</div>
+        <div class="role-box" onclick="selectRole('admin')"><span class="icon">&#9881;</span>${t('admin')}</div>
       </div>
       <div id="credentialsBox"></div>
     </div>
@@ -405,15 +561,15 @@ function loginPage(){
 function selectRole(role){
   document.getElementById("credentialsBox").innerHTML = `
     <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
-      <label>Username</label>
+      <label>${t('username')}</label>
       <input type="text" value="${role}_user" id="uname">
-      <label>Password</label>
+      <label>${t('password')}</label>
       <div class="password-wrap">
         <input type="password" value="demo123" id="pword">
-        <button type="button" class="show-password" onclick="togglePassword()">Show</button>
+        <button type="button" class="show-password" onclick="togglePassword()">${t('show')}</button>
       </div>
-      <button class="primary" onclick="doLogin('${role}')">Login as ${role.toUpperCase()}</button>
-      <div class="small-note">Prototype note: any credentials work — real system would verify against the database.</div>
+      <button class="primary" onclick="doLogin('${role}')">${t('login')} ${t(role)}</button>
+      <div class="small-note">${t('note')}</div>
     </div>`;
 }
 
@@ -428,10 +584,10 @@ function togglePassword(){
   if(!input || !btn) return;
   if(input.type === "password"){
     input.type = "text";
-    btn.textContent = "Hide";
+    btn.textContent = t("hide");
   }else{
     input.type = "password";
-    btn.textContent = "Show";
+    btn.textContent = t("show");
   }
 }
 
@@ -440,138 +596,137 @@ function togglePassword(){
 --------------------------------------------------------- */
 let qrStream = null;
 let qrScanTimer = null;
+let qrScanning = false;
+let qrDetector = null;
 
 function startQRScanner(){
-  const area = document.getElementById("scannerArea");
+  const area=document.getElementById('scannerArea');
   if(!area) return;
-
-  area.innerHTML = `
+  stopQRScanner(false);
+  area.innerHTML=`
     <div class="scanner-box">
       <b>Scan Instrument Certificate QR</b>
-      <div class="small-note">
-        Allow camera access when your browser asks. The scanner reads only the
-        certificate QR and shows the matching public certificate details.
+      <div class="small-note">Use your camera, or upload a clear image of the QR code.</div>
+      <video id="qrVideo" autoplay playsinline muted></video>
+      <canvas id="qrCanvas"></canvas>
+      <div id="scanMessage" class="scan-status">Starting camera...</div>
+      <div class="scanner-actions">
+        <button class="secondary" onclick="stopQRScanner()">Stop Scanner</button>
+        <label class="secondary" style="display:inline-block;margin:0;cursor:pointer;">Upload QR Image
+          <input type="file" accept="image/*" onchange="scanQRImage(event)" style="display:none;">
+        </label>
       </div>
-      <video id="qrVideo" autoplay playsinline></video>
-      <div id="scanMessage" class="small-note">Starting camera...</div>
-      <button class="secondary" onclick="stopQRScanner()" style="margin-top:8px;">Stop Scanner</button>
       <div style="margin-top:12px;text-align:left;">
         <label>Or enter Certificate ID manually</label>
         <input type="text" id="publicCertInput" placeholder="e.g. CERT-8841">
         <button class="secondary" onclick="verifyPublicCertificate()" style="margin-top:8px;">Verify Certificate</button>
       </div>
       <div id="publicCertResult"></div>
-    </div>
-  `;
+    </div>`;
 
-  const video = document.getElementById("qrVideo");
-  const message = document.getElementById("scanMessage");
-
-  if(!("BarcodeDetector" in window)){
-    message.textContent = "Automatic camera scanning is not supported in this browser. Use the Certificate ID field below.";
+  const video=document.getElementById('qrVideo');
+  const msg=document.getElementById('scanMessage');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    msg.textContent='Camera is not available in this browser. Use Upload QR Image or Certificate ID.';
     return;
   }
-
-  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}})
-    .then(stream => {
-      qrStream = stream;
-      video.srcObject = stream;
-      video.style.display = "block";
-      message.textContent = "Point the camera at the QR code on the certificate.";
-      scanQRCode();
+  if(location.protocol!=='https:' && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+    msg.innerHTML='<b>Camera requires HTTPS or localhost.</b><br>Because this HTML is opened directly as a file, use Upload QR Image / Certificate ID, or run the project through localhost for live camera scanning.';
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})
+    .then(stream=>{
+      qrStream=stream; qrScanning=true; video.srcObject=stream; video.style.display='block';
+      video.setAttribute('playsinline','true');
+      return video.play();
     })
-    .catch(() => {
-      message.textContent = "Camera access was unavailable. You can still enter the Certificate ID manually.";
+    .then(()=>{ msg.textContent='Point the camera steadily at the certificate QR code.'; beginQRDetection(); })
+    .catch(err=>{
+      msg.textContent='Camera could not be started ('+(err.name||'permission/browser error')+'). Use Upload QR Image or Certificate ID.';
     });
 }
 
-async function scanQRCode(){
-  const video = document.getElementById("qrVideo");
-  if(!video || !qrStream) return;
-
+async function beginQRDetection(){
+  if(!qrScanning) return;
+  const video=document.getElementById('qrVideo');
+  if(!video || video.readyState<2){ qrScanTimer=setTimeout(beginQRDetection,250); return; }
   try{
-    const detector = new BarcodeDetector({formats:["qr_code"]});
-    const codes = await detector.detect(video);
-
-    if(codes.length){
-      const raw = (codes[0].rawValue || "").trim();
-      stopQRScanner(false);
-
-      if(raw.toUpperCase().startsWith("VERIFY:")){
-        const certId = raw.substring(7).trim().toUpperCase();
-        document.getElementById("publicCertInput").value = certId;
-        verifyPublicCertificate(certId);
-      }else{
-        const result = document.getElementById("publicCertResult");
-        if(result) result.innerHTML = `<div class="public-cert"><b>Invalid QR</b><br>This QR code is not a certificate verification QR.</div>`;
+    let codes=[];
+    if('BarcodeDetector' in window){
+      if(!qrDetector) qrDetector=new BarcodeDetector({formats:['qr_code']});
+      codes=await qrDetector.detect(video);
+    }else{
+      const canvas=document.getElementById('qrCanvas');
+      if(canvas && window.jsQR){
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const code=jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,{inversionAttempts:'dontInvert'});
+        if(code) codes=[{rawValue:code.data}];
       }
-      return;
     }
-  }catch(e){
-    // Keep scanning; browser may temporarily fail while the camera is initializing.
-  }
+    if(codes.length){ handleScannedQR(codes[0].rawValue||''); return; }
+  }catch(e){}
+  qrScanTimer=setTimeout(beginQRDetection,250);
+}
 
-  qrScanTimer = setTimeout(scanQRCode, 300);
+function handleScannedQR(raw){
+  const value=String(raw).trim();
+  stopQRScanner(false);
+  let certId=value;
+  if(value.toUpperCase().startsWith('VERIFY:')) certId=value.substring(7).trim();
+  else{
+    const match=value.match(/(?:CERTIFICATE|CERT)[\s:_-]*([A-Z0-9-]+)/i);
+    if(match) certId=match[1];
+  }
+  const input=document.getElementById('publicCertInput');
+  if(input) input.value=certId.toUpperCase();
+  if(certId) verifyPublicCertificate(certId);
+  else{ const result=document.getElementById('publicCertResult'); if(result) result.innerHTML='<div class="public-cert"><b>Invalid QR</b><br>This QR does not contain a recognizable certificate ID.</div>'; }
+}
+
+function scanQRImage(event){
+  const file=event.target.files && event.target.files[0];
+  if(!file) return;
+  const msg=document.getElementById('scanMessage');
+  const result=document.getElementById('publicCertResult');
+  const reader=new FileReader();
+  reader.onload=function(){
+    const img=new Image();
+    img.onload=function(){
+      const canvas=document.getElementById('qrCanvas');
+      if(!canvas || !window.jsQR){ if(msg) msg.textContent='QR image scanning library is unavailable. Use Certificate ID.'; return; }
+      canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
+      const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.drawImage(img,0,0);
+      const code=jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,{inversionAttempts:'attemptBoth'});
+      if(code) handleScannedQR(code.data);
+      else if(result) result.innerHTML='<div class="public-cert"><b>QR not detected</b><br>Use a clear, well-lit image with the complete QR code visible.</div>';
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function stopQRScanner(clearArea=true){
-  if(qrScanTimer){
-    clearTimeout(qrScanTimer);
-    qrScanTimer = null;
-  }
-  if(qrStream){
-    qrStream.getTracks().forEach(track => track.stop());
-    qrStream = null;
-  }
-  const video = document.getElementById("qrVideo");
-  if(video){
-    video.pause();
-    video.srcObject = null;
-  }
-  if(clearArea){
-    const area = document.getElementById("scannerArea");
-    if(area) area.innerHTML = "";
-  }
+  qrScanning=false;
+  if(qrScanTimer){clearTimeout(qrScanTimer);qrScanTimer=null;}
+  if(qrStream){qrStream.getTracks().forEach(t=>t.stop());qrStream=null;}
+  const video=document.getElementById('qrVideo');
+  if(video){video.pause();video.srcObject=null;}
+  if(clearArea){const area=document.getElementById('scannerArea');if(area) area.innerHTML='';}
 }
 
 function verifyPublicCertificate(certId){
-  const input = document.getElementById("publicCertInput");
-  const result = document.getElementById("publicCertResult");
-  const value = (certId || (input ? input.value : "")).trim().toUpperCase();
-
+  const input=document.getElementById('publicCertInput');
+  const result=document.getElementById('publicCertResult');
+  const value=(certId || (input ? input.value : '')).trim().toUpperCase();
   if(!result) return;
-
-  if(!value){
-    result.innerHTML = `<div class="public-cert"><b>Please enter or scan a Certificate ID.</b></div>`;
-    return;
-  }
-
-  const inst = db.instruments.find(i => i.certId === value);
-
-  if(!inst){
-    result.innerHTML = `<div class="public-cert"><b>Certificate not found</b><br>No verified certificate matches <b>${value}</b>.</div>`;
-    return;
-  }
-
-  if(!inst.certId){
-    result.innerHTML = `<div class="public-cert"><b>Certificate not issued</b><br>This instrument does not have a certificate yet.</div>`;
-    return;
-  }
-
-  const today = new Date();
-  const expiry = new Date(inst.expiry);
-  const isValid = !isNaN(expiry.getTime()) && expiry >= today;
-
-  result.innerHTML = `
-    <div class="public-cert">
-      <b>Certificate Verified</b><br>
-      <b>Certificate ID:</b> ${inst.certId}<br>
-      <b>Instrument ID:</b> ${inst.id}<br>
-      <b>Instrument:</b> ${inst.type}<br>
-      <b>Owner:</b> ${inst.owner}<br>
-      <b>Valid Till:</b> ${inst.expiry}<br>
-      <b>Status:</b> <span class="status ${isValid ? "verified" : "overdue"}">${isValid ? "VALID" : "EXPIRED"}</span>
-    </div>`;
+  if(!value){result.innerHTML='<div class="public-cert"><b>Please enter or scan a Certificate ID.</b></div>';return;}
+  const inst=db.instruments.find(i=>i.certId===value);
+  if(!inst){result.innerHTML=`<div class="public-cert"><b>Certificate not found</b><br>No certificate matches <b>${value}</b>.</div>`;return;}
+  const expiry=new Date(inst.expiry+'T23:59:59');
+  const isValid=!isNaN(expiry.getTime()) && expiry.getTime()>=Date.now();
+  result.innerHTML=`<div class="public-cert"><b>Certificate Verified</b><br><b>Certificate ID:</b> ${inst.certId}<br><b>Instrument ID:</b> ${inst.id}<br><b>Instrument:</b> ${inst.type}<br><b>Owner:</b> ${inst.owner}<br><b>Valid Till:</b> ${inst.expiry}<br><b>Status:</b> <span class="status ${isValid?'verified':'overdue'}">${isValid?'VALID':'EXPIRED'}</span></div>`;
 }
 
 /* ---------------------------------------------------------
@@ -581,33 +736,33 @@ function ownerDashboard(){
   const mine = db.instruments.filter(i => i.owner === "Ramesh Traders" || i.owner === "Anand Logistics");
   return `
     <div class="card">
-      <h2>My Instruments</h2>
-      <label>Search by Instrument ID or Type</label>
-      <input type="text" id="ownerSearch" placeholder="e.g. INS-1001 or Weighbridge" oninput="filterOwnerTable()">
+      <h2>${t('myInstruments')}</h2>
+      <label>${t('searchInstrument')}</label>
+      <input type="text" id="ownerSearch" placeholder="${t('ownerSearchPlaceholder')}" oninput="filterOwnerTable()">
       <table id="ownerTable" style="margin-top:12px;">
-        <tr><th>Instrument ID</th><th>Type</th><th>Status</th><th>Certificate</th></tr>
+        <tr><th>${t('instrumentId')}</th><th>${t('type')}</th><th>${t('status')}</th><th>${t('certificate')}</th></tr>
         ${mine.map(i => `
           <tr>
             <td>${i.id}</td>
             <td>${i.type}</td>
-            <td><span class="status ${i.status}">${i.status.toUpperCase()}</span></td>
-            <td>${i.certId ? `<button class="secondary" onclick="viewCert('${i.certId}')">View QR</button>` : "—"}</td>
+            <td><span class="status ${i.status}">${t(i.status)}</span></td>
+            <td>${i.certId ? `<button class="secondary" onclick="viewCert('${i.certId}')">${t('viewQR')}</button>` : "—"}</td>
           </tr>`).join("")}
       </table>
     </div>
 
     <div class="card">
-      <h2>Apply for New Verification</h2>
-      <label>Instrument Type</label>
+      <h2>${t('applyVerification')}</h2>
+      <label>${t('instrumentType')}</label>
       <select id="newType">
         <option>Weighing Scale</option>
         <option>Fuel Dispenser</option>
         <option>Water Meter</option>
         <option>Weighbridge</option>
       </select>
-      <label>Upload Supporting Document</label>
+      <label>${t('uploadDocument')}</label>
       <input type="file">
-      <button class="primary" onclick="submitApplication()">Submit Application</button>
+      <button class="primary" onclick="submitApplication()">${t('submitApplication')}</button>
     </div>
 
     <div class="card" id="certViewer"></div>
@@ -627,7 +782,7 @@ function submitApplication(){
   const type = document.getElementById("newType").value;
   const newId = "INS-" + (1000 + db.instruments.length + 1);
   db.instruments.push({id:newId, type:type, owner:"Ramesh Traders", status:"pending", certId:null, expiry:null, assignedTo:"Unassigned"});
-  alert("Application submitted! Reference ID: " + newId);
+  alert(t("applicationSubmitted") + newId);
   go("owner");
 }
 
@@ -635,17 +790,17 @@ function viewCert(certId){
   const inst = db.instruments.find(i => i.certId === certId);
   const box = document.getElementById("certViewer");
   box.innerHTML = `
-    <h2>Digital Certificate — ${certId}</h2>
+    <h2>${t('digitalCertificate')} — ${certId}</h2>
     <div class="cert-box" id="printableCert">
       <div id="qrcode"></div>
       <div class="details">
-        <b>Instrument:</b> ${inst.type}<br>
-        <b>Owner:</b> ${inst.owner}<br>
-        <b>Valid Till:</b> ${inst.expiry}<br>
-        <span class="small-note">Scan this QR to verify authenticity publicly.</span>
+        <b>${t('instrument')}:</b> ${inst.type}<br>
+        <b>${t('ownerLabel')}:</b> ${inst.owner}<br>
+        <b>${t('validTill')}:</b> ${inst.expiry}<br>
+        <span class="small-note">${t('scanToVerify')}</span>
       </div>
     </div>
-    <button class="secondary" style="margin-top:12px;" onclick="window.print()">Print / Export Certificate</button>`;
+    <button class="secondary" style="margin-top:12px;" onclick="window.print()">${t('printCertificate')}</button>`;
   new QRCode(document.getElementById("qrcode"), {
     text: "VERIFY:" + certId,
     width: 110, height: 110
@@ -661,14 +816,14 @@ function officerDashboard(labelPrefix){
   );
   return `
     <div class="card">
-      <h2>Assigned Verification Tasks</h2>
+      <h2>${t('assignedTasks')}</h2>
       <table>
-        <tr><th>Instrument ID</th><th>Type</th><th>Owner</th><th>Status</th><th>Action</th></tr>
+        <tr><th>${t('instrumentId')}</th><th>${t('type')}</th><th>${t('ownerLabel')}</th><th>${t('status')}</th><th>${t('action')}</th></tr>
         ${assigned.map(i => `
           <tr>
             <td>${i.id}</td><td>${i.type}</td><td>${i.owner}</td>
-            <td><span class="status ${i.status}">${i.status.toUpperCase()}</span></td>
-            <td><button class="secondary" onclick="openInspection('${i.id}')">Inspect</button></td>
+            <td><span class="status ${i.status}">${t(i.status)}</span></td>
+            <td><button class="secondary" onclick="openInspection('${i.id}')">${t('inspect')}</button></td>
           </tr>`).join("")}
       </table>
     </div>
@@ -679,12 +834,12 @@ function officerDashboard(labelPrefix){
 function openInspection(id){
   const inst = db.instruments.find(i => i.id === id);
   document.getElementById("inspectionForm").innerHTML = `
-    <h2>Record Inspection — ${id}</h2>
-    <label>Observation</label>
-    <select id="obs"><option>Pass — within tolerance</option><option>Fail — out of tolerance</option></select>
-    <label>Remarks</label>
-    <input type="text" placeholder="e.g. calibrated against standard weight set">
-    <button class="primary" onclick="completeInspection('${id}')">Submit &amp; Generate Certificate</button>
+    <h2>${t('recordInspection')} — ${id}</h2>
+    <label>${t('observation')}</label>
+    <select id="obs"><option>${t('passTolerance')}</option><option>${t('failTolerance')}</option></select>
+    <label>${t('remarks')}</label>
+    <input type="text" placeholder="${t('remarksPlaceholder')}">
+    <button class="primary" onclick="completeInspection('${id}')">${t('submitGenerate')}</button>
   `;
 }
 
@@ -693,7 +848,7 @@ function completeInspection(id){
   inst.status = "verified";
   inst.certId = "CERT-" + Math.floor(1000+Math.random()*9000);
   inst.expiry = "2027-09-05";
-  alert("Inspection recorded. Certificate " + inst.certId + " generated for " + id);
+  alert(t("inspectionRecorded") + inst.certId + t("generatedFor") + id);
   go(db.currentRole);
 }
 
@@ -708,30 +863,30 @@ function adminDashboard(){
 
   return `
     <div class="stat-row">
-      <div class="stat-box"><div class="num">${total}</div><div class="label">Total Instruments</div></div>
-      <div class="stat-box"><div class="num">${verified}</div><div class="label">Verified</div></div>
-      <div class="stat-box"><div class="num">${pending}</div><div class="label">Pending / Assigned</div></div>
-      <div class="stat-box"><div class="num">${overdue}</div><div class="label">Overdue</div></div>
+      <div class="stat-box"><div class="num">${total}</div><div class="label">${t('totalInstruments')}</div></div>
+      <div class="stat-box"><div class="num">${verified}</div><div class="label">${t('verified')}</div></div>
+      <div class="stat-box"><div class="num">${pending}</div><div class="label">${t('pendingAssigned')}</div></div>
+      <div class="stat-box"><div class="num">${overdue}</div><div class="label">${t('overdue')}</div></div>
     </div>
 
     <div class="card">
-      <h2>Search &amp; Retrieve Records</h2>
-      <label>Search by Instrument ID, Owner, or Type</label>
-      <input type="text" id="adminSearch" placeholder="e.g. Ramesh, Weighbridge, INS-1004" oninput="filterAdminTable()">
+      <h2>${t('searchRetrieve')}</h2>
+      <label>${t('searchAdmin')}</label>
+      <input type="text" id="adminSearch" placeholder="${t('adminSearchPlaceholder')}" oninput="filterAdminTable()">
     </div>
 
     <div class="card">
-      <h2>All Applications — System Wide</h2>
+      <h2>${t('allApplications')}</h2>
       <table id="adminTable">
-        <tr><th>ID</th><th>Type</th><th>Owner</th><th>Assigned To</th><th>Status</th></tr>
+        <tr><th>${t('instrumentId')}</th><th>${t('type')}</th><th>${t('ownerLabel')}</th><th>${t('assignedTo')}</th><th>${t('status')}</th></tr>
         ${db.instruments.map(i => `
           <tr>
             <td>${i.id}</td><td>${i.type}</td><td>${i.owner}</td>
             <td>${i.assignedTo}</td>
-            <td><span class="status ${i.status}">${i.status.toUpperCase()}</span></td>
+            <td><span class="status ${i.status}">${t(i.status)}</span></td>
           </tr>`).join("")}
       </table>
-      <button class="secondary" style="margin-top:12px;" onclick="exportReport()">Export Report (CSV)</button>
+      <button class="secondary" style="margin-top:12px;" onclick="exportReport()">${t('exportReport')}</button>
     </div>
   `;
 }
