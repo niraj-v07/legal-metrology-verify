@@ -267,6 +267,49 @@
     .header-language select{min-width:92px;padding:6px 22px 6px 8px;}
   }
 
+
+  /* Support email button */
+  .support-button{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    width:52px;
+    height:52px;
+    border:none;
+    border-radius:50%;
+    background:var(--navy);
+    color:#fff;
+    font-size:24px;
+    cursor:pointer;
+    box-shadow:0 3px 10px rgba(0,0,0,.25);
+    z-index:9998;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .support-button:hover{background:var(--navy-dark);}
+  .support-popup{
+    position:fixed;
+    right:20px;
+    bottom:82px;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:16px 18px;
+    box-shadow:0 4px 16px rgba(0,0,0,.2);
+    z-index:9999;
+    font-size:13px;
+    display:none;
+  }
+  .support-popup.show{display:block;}
+  .support-popup .support-title{
+    color:var(--navy);
+    font-weight:600;
+    margin-bottom:7px;
+  }
+  .support-popup a{color:var(--navy);text-decoration:none;font-weight:600;}
+  .support-popup a:hover{text-decoration:underline;}
+
 </style>
 </head>
 <body>
@@ -287,6 +330,13 @@
 <main id="app"></main>
 
 <footer>Prototype build — SIH26036 — Team TechOptimus</footer>
+
+<button class="support-button" type="button" aria-label="Support" title="Support" onclick="toggleSupportPopup()">&#9993;</button>
+<div class="support-popup" id="supportPopup">
+  <div class="support-title" id="supportTitle">Support</div>
+  <a href="mailto:support.techoptimus@gmail.com">support.techoptimus@gmail.com</a>
+</div>
+
 
 <script>
 /* ---------------------------------------------------------
@@ -538,6 +588,7 @@ function changeLanguage(lang){
   currentLanguage=lang;
   document.documentElement.lang=lang==='hi'?'hi':(lang==='ta'?'ta':'en');
   render();
+  updateSupportLanguage();
 }
 
 /* ---------------------------------------------------------
@@ -923,6 +974,28 @@ function exportReport(){
    for future event delegation if the app grows.
 --------------------------------------------------------- */
 function attachHandlers(){ /* inline onclick handlers used for simplicity in this prototype */ }
+
+
+const supportTranslations = {
+  en: {support:'Support'},
+  hi: {support:'सहायता'},
+  ta: {support:'ஆதரவு'}
+};
+
+function updateSupportLanguage(){
+  const text = supportTranslations[currentLanguage] || supportTranslations.en;
+  const title = document.getElementById("supportTitle");
+  const button = document.querySelector(".support-button");
+  if(title) title.textContent = text.support;
+  if(button){
+    button.setAttribute("aria-label", text.support);
+    button.setAttribute("title", text.support);
+  }
+}
+
+function toggleSupportPopup(){
+  document.getElementById("supportPopup").classList.toggle("show");
+}
 
 render();
 </script>
